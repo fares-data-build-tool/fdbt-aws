@@ -1,0 +1,59 @@
+service: tfn-aws
+
+provider:
+  name: aws
+  region: eu-west-2
+
+resources: 
+  Resources: 
+    Policy:
+      Type: "AWS::IAM::ManagedPolicy"
+      Properties: 
+        Description: "Policy for cicd accounts"
+        Path: /
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement: 
+            - Effect: Allow
+              Action: 
+                - 's3:*'
+                - 'logs:*'
+                -  'cloudformation:*'
+                -  'iam:*'
+                -  'cloudfront:*'
+                -  'cloudwatch:*'
+                -  'waf:*'
+                -  'route53:*'
+                -  'lambda:*'
+                -  'waf-regional:*'
+                -  'acm:DescribeCertificate'
+                -  'acm:GetCertificate'
+                -  'acm:ListTagsForCertificate'
+                -  'acm:ListCertificates'
+                -  'apigateway:*'
+              Resource: '*'
+    Group:
+      Type: 'AWS::IAM::Group'
+      Properties:
+        GroupName: 'tfn-group'
+        ManagedPolicyArns: 
+          - !Ref Policy
+    User:
+      Type: 'AWS::IAM::User'
+      Properties:
+        UserName: "tfn"
+        Groups: 
+          - !Ref Group
+    Keys:
+      Type: 'AWS::IAM::AccessKey'
+      Properties:
+        UserName: tfn
+  Outputs:
+    AccessKey:
+      Value: !Ref Keys
+      Description: AWSAccessKeyId of new user
+    SecretKey:
+      Value: !GetAtt 
+        - Keys
+        - SecretAccessKey
+      Description: AWSSecretKey of new user

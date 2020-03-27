@@ -208,3 +208,9 @@ Resources:
       VPCZoneIdentifier:
         - Fn::ImportValue: !Sub ${Stage}:PrivateSubnetA
         - Fn::ImportValue: !Sub ${Stage}:PrivateSubnetB
+
+Outputs:
+  RefDataUploaderLambdaSG:
+    Value: !Ref "UploaderSecurityGroup"
+    Export:
+      Name: !Sub ${Stage}-RefDataUploaderLambdaSG

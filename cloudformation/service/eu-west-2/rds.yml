@@ -54,6 +54,19 @@ Resources:
         - Key: Name
           Value: !Sub ${ProductName}-db-sg-${Stage}
 
+  UploaderSecurityGroup:
+      Type: "AWS::EC2::SecurityGroup"
+      Properties:
+        GroupDescription: Allow all outbound traffic, no inbound
+        SecurityGroupIngress:
+          - IpProtocol: -1
+            CidrIp: 127.0.0.1/32
+        VpcId:
+          Fn::ImportValue: !Sub ${Stage}:VpcId
+        Tags:
+          - Key: Name
+            Value: !Sub ${ProductName}-ref-data-uploader-sg-${Stage}
+
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:

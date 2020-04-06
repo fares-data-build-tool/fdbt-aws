@@ -9,5 +9,4 @@ CREATE TABLE tndsService(
     `serviceCode` varchar(255) DEFAULT NULL,
     `description` varchar(255) DEFAULT NULL,
     INDEX idx_nocCode (nocCode),
-    -- PRIMARY KEY('nocCode', 'lineName', 'startDate')
 ) ENGINE = InnoDB CHARACTER SET = utf8;

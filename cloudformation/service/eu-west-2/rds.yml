@@ -214,6 +214,11 @@ Resources:
         - Fn::ImportValue: !Sub ${Stage}:PrivateSubnetB
 
 Outputs:
+  RdsHostName:
+    Value: !GetAtt DatabaseMasterInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${Stage}:RdsHostName
+
   RefDataUploaderLambdaSG:
     Value: !Ref "UploaderSecurityGroup"
     Export:

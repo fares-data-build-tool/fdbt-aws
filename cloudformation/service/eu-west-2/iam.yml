@@ -154,7 +154,7 @@ Resources:
                 Action:
                   - "s3:ListBucket"
                 Resource:
-                  - !Sub arn:aws:s3:::fdbt-csv-reference-data-${self:provider.stage}/*
+                  - !Sub arn:aws:s3:::fdbt-csv-reference-data-${self:provider.stage}
           PolicyName: allow-aurora-s3-access
 
   SlackLambdaRole:

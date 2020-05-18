@@ -68,5 +68,3 @@ Outputs:
     Value: !Ref UserPoolClient
     Export:
       Name: !Sub ${Stage}:UserPoolClientID
-
-

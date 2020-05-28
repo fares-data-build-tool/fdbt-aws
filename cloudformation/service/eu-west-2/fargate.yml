@@ -25,23 +25,37 @@ Parameters:
   SiteContainerMemory:
     Type: Number
     Default: 512
-    Description: How much memory in megabytes to give the site container
+    Description: How much memory in MiB to give the site container
   SiteDesiredCount:
     Type: Number
     Default: 1
     Description: How many copies of the site service task to run
+  MonitoringImage:
+    Type: String
+    Description: The monitoring docker image
+    Default: grafana/grafana:7.0.1
+  MonitoringContainerPort:
+    Type: Number
+    Default: 3000
+    Description: Port on which the monitoring process is running in the container
+  MonitoringContainerCpu:
+    Type: Number
+    Default: 256
+    Description: How much CPU to give the monitoring container. 1024 is 1 CPU
+  MonitoringContainerMemory:
+    Type: Number
+    Default: 512
+    Description: How much memory in MiB to give the monitoring container
+  MonitoringDesiredCount:
+    Type: Number
+    Default: 1
+    Description: How many copies of the monitoring service task to run
+  MonitoringDomain:
+    Type: String
+    Description: Domain for monitoring
 
 Resources:
-  SiteLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub ${ProductName}-site-${Stage}
-
-  MonitoringLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub ${ProductName}-monitoring-${Stage}
-
+  # ECS Resources
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -91,6 +105,43 @@ Resources:
               Value:
                 Fn::ImportValue: !Sub ${Stage}:UserPoolID
 
+  MonitoringTaskDefinitionTemp:
+    Type: Custom::TaskDefinition
+    Properties:
+      ServiceToken: !GetAtt CustomTaskDefinitionFunction.Arn
+      TaskDefinition:
+        family: !Sub ${ProductName}-monitoring-${Stage}
+        cpu: !Ref MonitoringContainerCpu
+        memory: !Ref MonitoringContainerMemory
+        networkMode: awsvpc
+        requiresCompatibilities:
+          - FARGATE
+        executionRoleArn:
+          Fn::ImportValue: !Sub ${Stage}:EcsTaskExecutionRoleArn
+        taskRoleArn:
+          Fn::ImportValue: !Sub ${Stage}:EcsMonitoringTaskRoleArn
+        volumes:
+          - name: efs
+            efsVolumeConfiguration:
+              fileSystemId: !Ref EFSMonitoringFileSystem
+        containerDefinitions:
+          - name: !Sub ${ProductName}-monitoring-${Stage}
+            cpu: !Ref MonitoringContainerCpu
+            memory: !Ref MonitoringContainerMemory
+            image: !Ref MonitoringImage
+            portMappings:
+              - containerPort: !Ref MonitoringContainerPort
+            mountPoints:
+              - sourceVolume: efs
+                containerPath: /var/lib/grafana
+            user: root
+            logConfiguration:
+              logDriver: awslogs
+              options:
+                awslogs-group: !Ref MonitoringLogGroup
+                awslogs-region: !Ref AWS::Region
+                awslogs-stream-prefix: !Ref ProductName
+
   SiteService:
     Type: AWS::ECS::Service
     Properties:
@@ -116,6 +167,33 @@ Resources:
           ContainerPort: !Ref SiteContainerPort
           TargetGroupArn: !Ref SiteTargetGroup
 
+  MonitoringService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${ProductName}-monitoring-${Stage}
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      PlatformVersion: "1.4.0"
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      DesiredCount: !Ref MonitoringDesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - Fn::ImportValue: !Sub ${Stage}:FargateMonitoringContainerSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub ${Stage}:PrivateSubnetA
+            - Fn::ImportValue: !Sub ${Stage}:PrivateSubnetB
+      TaskDefinition: !Ref MonitoringTaskDefinitionTemp
+      LoadBalancers:
+        - ContainerName: !Sub ${ProductName}-monitoring-${Stage}
+          ContainerPort: !Ref MonitoringContainerPort
+          TargetGroupArn: !Ref MonitoringTargetGroup
+
+  # ALB Resources
+
   SiteTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -124,11 +202,28 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
       TargetType: ip
       Name: !Sub ${ProductName}-site-tg-${Stage}
       Port: !Ref SiteContainerPort
       Protocol: HTTP
+      VpcId:
+        Fn::ImportValue: !Sub ${Stage}:VpcId
+
+  MonitoringTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: PublicLoadBalancer
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /api/health
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
+      TargetType: ip
+      Name: !Sub ${ProductName}-monitoring-tg-${Stage}
+      Port: !Ref MonitoringContainerPort
+      Protocol: HTTP
       VpcId:
         Fn::ImportValue: !Sub ${Stage}:VpcId
 
@@ -158,6 +253,20 @@ Resources:
       Port: 443
       Protocol: HTTPS
 
+  MonitoringListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref MonitoringTargetGroup
+          Type: forward
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values:
+              - !Ref MonitoringDomain
+      ListenerArn: !Ref PublicLoadBalancerListener
+      Priority: 1
+
   ALBRedirectHttpsListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -172,6 +281,131 @@ Resources:
       LoadBalancerArn: !Ref PublicLoadBalancer
       Port: 80
       Protocol: HTTP
+
+  # EFS Resources
+
+  EFSMonitoringFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${ProductName}-monitoring-fs-${Stage}
+
+  EFSMonitoringMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSMonitoringFileSystem
+      SecurityGroups:
+        - Fn::ImportValue: !Sub ${Stage}:EFSMonitoringMountTargetSecurityGroup
+      SubnetId:
+        Fn::ImportValue: !Sub ${Stage}:PrivateSubnetA
+
+  EFSMonitoringMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSMonitoringFileSystem
+      SecurityGroups:
+        - Fn::ImportValue: !Sub ${Stage}:EFSMonitoringMountTargetSecurityGroup
+      SubnetId:
+        Fn::ImportValue: !Sub ${Stage}:PrivateSubnetB
+
+  # CloudWatch Resources
+
+  SiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${ProductName}-site-${Stage}
+
+  MonitoringLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${ProductName}-monitoring-${Stage}
+
+  # Custom Resources
+
+  # This custom task definition is to temporarily address the fact that CloudFormation does not yet support adding EFS as a volume in ECS
+  CustomTaskDefinitionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const aws = require('aws-sdk')
+          const response = require('cfn-response')
+          const ecs = new aws.ECS({apiVersion: '2014-11-13'})
+
+          exports.handler = function(event, context) {
+            console.log("REQUEST RECEIVED:\n" + JSON.stringify(event))
+
+            if (event.RequestType === 'Create' || event.RequestType === 'Update') {
+              ecs.registerTaskDefinition(event.ResourceProperties.TaskDefinition, function(err, data) {
+                if (err) {
+                  console.error(err);
+                  response.send(event, context, response.FAILED)
+                } else {
+                  console.log(`Created/Updated task definition ${data.taskDefinition.taskDefinitionArn}`)
+                  response.send(event, context, response.SUCCESS, {}, data.taskDefinition.taskDefinitionArn)
+                }
+              })
+            } else if (event.RequestType === 'Delete') {
+              ecs.deregisterTaskDefinition({taskDefinition: event.PhysicalResourceId}, function(err) {
+                if (err) {
+                  if (err.code === 'InvalidParameterException') {
+                    console.log(`Task definition: ${event.PhysicalResourceId} does not exist. Skipping deletion.`)
+                    response.send(event, context, response.SUCCESS)
+                  } else {
+                    console.error(err)
+                    response.send(event, context, response.FAILED)
+                  }
+                } else {
+                  console.log(`Removed task definition ${event.PhysicalResourceId}`)
+                  response.send(event, context, response.SUCCESS)
+                }
+              })
+            } else {
+              console.error(`Unsupported request type: ${event.RequestType}`)
+              response.send(event, context, response.FAILED)
+            }
+          }
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt CustomTaskDefinitionRole.Arn
+      Runtime: nodejs10.x
+      Timeout: 30
+
+  CustomTaskDefinitionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: customresource
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecs:DeregisterTaskDefinition"
+                  - "ecs:RegisterTaskDefinition"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "iam:PassRole"
+                Resource:
+                  - Fn::ImportValue: !Sub ${Stage}:EcsTaskExecutionRoleArn
+                  - Fn::ImportValue: !Sub ${Stage}:EcsMonitoringTaskRoleArn
 
 Outputs:
   LoadbalancerArn:

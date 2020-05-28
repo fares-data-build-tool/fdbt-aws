@@ -104,6 +104,19 @@ Resources:
                 Resource: "*"
           PolicyName: ecs-site-task-policy
 
+  EcsMonitoringTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ecs-tasks.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+
   EcsTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -261,6 +274,10 @@ Outputs:
     Value: !GetAtt EcsSiteTaskRole.Arn
     Export:
       Name: !Sub ${Stage}:EcsSiteTaskRoleArn
+  EcsMonitoringTaskRoleArn:
+    Value: !GetAtt EcsMonitoringTaskRole.Arn
+    Export:
+      Name: !Sub ${Stage}:EcsMonitoringTaskRoleArn
   EcsTaskExecutionRoleArn:
     Value: !GetAtt EcsTaskExecutionRole.Arn
     Export:

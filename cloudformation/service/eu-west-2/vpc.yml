@@ -287,6 +287,17 @@ Resources:
           ToPort: 80
       VpcId: !Ref VPC
 
+  FargateMonitoringContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Fargate Monitoring containers
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+      VpcId: !Ref VPC
+
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -300,6 +311,17 @@ Resources:
           IpProtocol: tcp
           FromPort: 443
           ToPort: 443
+      VpcId: !Ref VPC
+
+  EFSMonitoringMountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to EFS from Monitoring ECS Tasks
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref FargateMonitoringContainerSecurityGroup
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
       VpcId: !Ref VPC
 
 Outputs:
@@ -347,7 +369,15 @@ Outputs:
     Value: !Ref FargateSiteContainerSecurityGroup
     Export:
       Name: !Sub ${Stage}:FargateSiteContainerSecurityGroup
+  FargateMonitoringContainerSecurityGroup:
+    Value: !Ref FargateMonitoringContainerSecurityGroup
+    Export:
+      Name: !Sub ${Stage}:FargateMonitoringContainerSecurityGroup
   LoadBalancerSecurityGroup:
     Value: !Ref LoadBalancerSecurityGroup
     Export:
       Name: !Sub ${Stage}:LoadBalancerSecurityGroup
+  EFSMonitoringMountTargetSecurityGroup:
+    Value: !Ref EFSMonitoringMountTargetSecurityGroup
+    Export:
+      Name: !Sub ${Stage}:EFSMonitoringMountTargetSecurityGroup

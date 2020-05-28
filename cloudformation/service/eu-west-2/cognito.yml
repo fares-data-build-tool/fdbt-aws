@@ -126,7 +126,7 @@ Outputs:
     Value: !Ref UserPoolClient
     Export:
       Name: !Sub ${Stage}:UserPoolClientID
-  UserPoolId:
+  UserPoolID:
     Value: !Ref UserPool
     Export:
-      Name: !Sub ${Stage}:UserPoolId
+      Name: !Sub ${Stage}:UserPoolID

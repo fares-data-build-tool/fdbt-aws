@@ -19,7 +19,7 @@ def template_register(username, key, register_link):
                        <h1>Create account - Fares Data Build Tool</h1>
                        <p>To create an account to access the Fares Data Build Tool click the link below:</p>
                        <a href="{register_link}?key={key}">Link to registration</a>
-                       <p>The link is valid for 72 hours for the following email address {username}</p>
+                       <p>The link is valid for 72 hours for the following email address {username}.</p>
                    </div>"""
 
     return get_base_template(template)
@@ -30,7 +30,8 @@ def template_forgotten_password(email, code, password_link):
                        <h1>Recover Password - Fares Data Build Tool</h1>
                        <p>To recover your password for the Fares Data Build Tool click on the link below:</p>
                        <a href="{password_link}?key={code}&user_name={email}">Link to reset password</a>
-                       <p>If this wasn't you, please contact tfn@infinityworks.com</p>
+                       <p>The link is valid for 24 hours from the time it was requested.</p>
+                       <p>If this wasn't you, please contact tfn@infinityworks.com.</p>
                     </div>"""
 
     return get_base_template(email_body)

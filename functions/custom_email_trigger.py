@@ -1,38 +1,43 @@
 import os
 
+
 def handler(event, context):
     if event['triggerSource'] == "CustomMessage_AdminCreateUser":
-        registerLink = os.getenv('REGISTRATION_LINK')
+        register_link = os.getenv('REGISTRATION_LINK')
         event['response']['emailSubject'] = "Register for the Fares Data Build Tool"
-        event['response']['emailMessage'] = templateRegister(event['request']['usernameParameter'], event['request']['codeParameter'],registerLink)
+        event['response']['emailMessage'] = template_register(event['request']['usernameParameter'], event['request']['codeParameter'],register_link)
     elif event['triggerSource'] == "CustomMessage_ForgotPassword":
-        forgottenPasswordLink = os.getenv('FORGOTTEN_PASSWORD_LINK')
+        forgotten_password_link = os.getenv('FORGOTTEN_PASSWORD_LINK')
         event['response']['emailSubject'] = "Reset your password"
-        event['response']['emailMessage'] = templateForgottenPassword(event['request']['userAttributes']['email'], event['request']['codeParameter'], forgottenPasswordLink)
+        event['response']['emailMessage'] = template_forgotten_password(event['request']['userAttributes']['email'], event['request']['codeParameter'], forgotten_password_link)
+
     return event
 
-def templateRegister(username, key, registerLink):
+
+def template_register(username, key, register_link):
     template = f"""<div style="font-family: Arial, sans-serif; padding-left: 30px">
                        <h1>Create account - Fares Data Build Tool</h1>
                        <p>To create an account to access the Fares Data Build Tool click the link below:</p>
-                       <a href="{registerLink}?key={key}">Link to registration</a>
+                       <a href="{register_link}?key={key}">Link to registration</a>
                        <p>The link is valid for 72 hours for the following email address {username}</p>
                    </div>"""
 
-    return baseTemplate(template)
+    return get_base_template(template)
 
-def templateForgottenPassword(email, code, passwordLink):
-    emailBody = f"""<div style="font-family: Arial, sans-serif; padding-left: 30px">
+
+def template_forgotten_password(email, code, password_link):
+    email_body = f"""<div style="font-family: Arial, sans-serif; padding-left: 30px">
                        <h1>Recover Password - Fares Data Build Tool</h1>
                        <p>To recover your password for the Fares Data Build Tool click on the link below:</p>
-                       <a href="{passwordLink}?key={code}&user_name={email}">Link to reset password</a>
+                       <a href="{password_link}?key={code}&user_name={email}">Link to reset password</a>
                        <p>If this wasn't you, please contact tfn@infinityworks.com</p>
                     </div>"""
 
-    return baseTemplate(emailBody)
+    return get_base_template(email_body)
 
-def baseTemplate(messageBody):
-    baseTemplate = f"""<!DOCTYPE html> <html lang="en"><head><title>Fares Data Build Tool</title></head>
+
+def get_base_template(message_body):
+    base_template = f"""<!DOCTYPE html> <html lang="en"><head><title>Fares Data Build Tool</title></head>
                              <body class="govuk-template-body">
                                <div id="main">
                                  <div>
@@ -70,9 +75,9 @@ def baseTemplate(messageBody):
                                        </div>
                                      </div>
                                    </header>
-                                  {messageBody}
+                                  {message_body}
                                  </div>
                                </div>
                              </body>
                            </html>"""
-    return baseTemplate
+    return base_template

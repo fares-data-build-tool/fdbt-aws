@@ -1,7 +1,6 @@
 import os
-import time
 import math
-
+import datetime
 
 def handler(event, context):
     if event['triggerSource'] == "CustomMessage_AdminCreateUser":
@@ -10,7 +9,11 @@ def handler(event, context):
         event['response']['emailMessage'] = template_register(event['request']['usernameParameter'], event['request']['codeParameter'],register_link)
     elif event['triggerSource'] == "CustomMessage_ForgotPassword":
         forgotten_password_link = os.getenv('FORGOTTEN_PASSWORD_LINK')
-        ts = time.time()
+        current_time = datetime.datetime.now()
+
+        current_time_plus_one_hour = current_time + datetime.timedelta(hours=1)
+        ts = current_time_plus_one_hour.timestamp()
+
         event['response']['emailSubject'] = "Reset your password"
         event['response']['emailMessage'] = template_forgotten_password(event['request']['userAttributes']['email'], event['request']['codeParameter'], forgotten_password_link, math.floor(ts))
 

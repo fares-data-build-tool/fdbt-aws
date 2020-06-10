@@ -9,7 +9,7 @@ def handler(event, context):
         event['response']['emailMessage'] = template_register(event['request']['usernameParameter'], event['request']['codeParameter'],register_link)
     elif event['triggerSource'] == "CustomMessage_ForgotPassword":
         forgotten_password_link = os.getenv('FORGOTTEN_PASSWORD_LINK')
-        current_time = datetime.datetime.now()
+        current_time = datetime.datetime.utcnow()
 
         current_time_plus_one_hour = current_time + datetime.timedelta(hours=1)
         ts = current_time_plus_one_hour.timestamp()

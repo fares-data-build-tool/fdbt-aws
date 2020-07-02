@@ -30,5 +30,5 @@ Resources:
         - AttributeName: !Ref "HashKeyName"
           KeyType: HASH
       TimeToLiveSpecification:
-        AttributeName: ttl
+        AttributeName: expires
         Enabled: true

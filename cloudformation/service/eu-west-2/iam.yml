@@ -128,6 +128,7 @@ Resources:
                   - "dynamodb:GetItem"
                   - "dynamodb:PutItem"
                   - "dynamodb:UpdateItem"
+                Resource: "*"
           PolicyName: ecs-site-task-policy
 
   EcsMonitoringTaskRole:

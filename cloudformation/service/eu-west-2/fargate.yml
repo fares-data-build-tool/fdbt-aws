@@ -61,10 +61,18 @@ Parameters:
     MinLength: "8"
     NoEcho: "true"
     Type: String
-
+  ExternalCertificateArn:
+    Type: String
+    Default: ""
+    Description: ARN for ACM certificate for external domain
+  MonitoringIpWhitelist:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: List of IPs to whitelist for monitoring
 
 Conditions:
   IsTest: !Equals [!Ref Stage, "test"]
+  IsProd: !Equals [!Ref Stage, "prod"]
 
 Resources:
   # ECS Resources
@@ -163,6 +171,7 @@ Resources:
 
   SiteService:
     Type: AWS::ECS::Service
+    DependsOn: PublicLoadBalancerListener
     Properties:
       ServiceName: !Sub ${ProductName}-site-${Stage}
       Cluster: !Ref ECSCluster
@@ -188,6 +197,7 @@ Resources:
 
   MonitoringService:
     Type: AWS::ECS::Service
+    DependsOn: PublicLoadBalancerListener
     Properties:
       ServiceName: !Sub ${ProductName}-monitoring-${Stage}
       Cluster: !Ref ECSCluster
@@ -273,6 +283,14 @@ Resources:
       Protocol: HTTPS
       SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
 
+  ListenerExternalCertificate:
+    Type: AWS::ElasticLoadBalancingV2::ListenerCertificate
+    Condition: IsProd
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref ExternalCertificateArn
+      ListenerArn: !Ref PublicLoadBalancerListener
+
   MonitoringListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -284,6 +302,9 @@ Resources:
           HostHeaderConfig:
             Values:
               - !Ref MonitoringDomain
+        - Field: source-ip
+          SourceIpConfig:
+            Values: !Ref MonitoringIpWhitelist
       ListenerArn: !Ref PublicLoadBalancerListener
       Priority: 1
 

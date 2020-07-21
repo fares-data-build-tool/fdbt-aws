@@ -11,7 +11,6 @@ CREATE TABLE salesOfferPackage(
     `paymentMethod` varchar(255) DEFAULT NULL,
     `ticketFormat` varchar(255) DEFAULT NULL,
     INDEX idx_nocCode (nocCode),
-    CONSTRAINT fk_salesOfferPackage_nocTable_nocCode FOREIGN KEY (nocCode) REFERENCES nocTable(nocCode),
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB CHARACTER SET = utf8;
 

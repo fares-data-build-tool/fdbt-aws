@@ -114,10 +114,13 @@ Resources:
         - email
         - email_verified
         - custom:noc
+        - custom:contactable
+        - custom:schemeOperator
       WriteAttributes:
         - email
         - custom:noc
         - custom:contactable
+        - custom:schemeOperator
       PreventUserExistenceErrors: ENABLED
 
 Outputs:

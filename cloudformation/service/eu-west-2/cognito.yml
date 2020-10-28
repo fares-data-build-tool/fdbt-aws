@@ -76,6 +76,12 @@ Resources:
             MaxLength: "256"
             MinLength: "1"
           Mutable: true
+        - Name: schemeRegionCode
+          AttributeDataType: String
+          StringAttributeConstraints:
+            MaxLength: "2"
+            MinLength: "1"
+          Mutable: true
       UsernameAttributes:
         - email
       UsernameConfiguration:
@@ -115,11 +121,13 @@ Resources:
         - email_verified
         - custom:noc
         - custom:schemeOperator
+        - custom:schemeRegionCode
       WriteAttributes:
         - email
         - custom:noc
         - custom:contactable
         - custom:schemeOperator
+        - custom:schemeRegionCode
       PreventUserExistenceErrors: ENABLED
 
 Outputs:

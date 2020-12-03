@@ -113,6 +113,9 @@ Parameters:
   SupportEmailAddress:
     Type: String
     Description: The email address to be used for user support
+  ServiceEmailAddress:
+    Type: String
+    Description: The email address used by the service to email users
 
 Conditions:
   IsTest: !Equals [!Ref Stage, "test"]
@@ -176,6 +179,8 @@ Resources:
               Value: !Ref SupportPhoneNumber
             - Name: SUPPORT_EMAIL_ADDRESS
               Value: !Ref SupportEmailAddress
+            - Name: SERVICE_EMAIL_ADDRESS
+              Value: !Ref ServiceEmailAddress
 
   MonitoringTaskDefinition:
     Type: AWS::ECS::TaskDefinition

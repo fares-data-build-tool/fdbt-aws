@@ -108,7 +108,7 @@ Parameters:
     Default: ""
     Description: ARN for ACM certificate for external domain
   SupportPhoneNumber:
-    Type: Number
+    Type: String
     Description: The phone number to be used for user support
   SupportEmailAddress:
     Type: String

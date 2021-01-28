@@ -5,7 +5,7 @@ if [ -z $PATH_TO_USER_EMAILS_FILE ]; then
   exit 1
 fi
 
-while IFS= read -r email
+while read -r email
 do
   ./cognito-manager delete-user $email
   echo "Deleted $email"

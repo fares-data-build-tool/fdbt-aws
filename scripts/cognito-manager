@@ -101,9 +101,7 @@ function verify_all_emails() {
 }
 
 function get_all_user_emails() {
-  aws cognito-idp list-users --user-pool-id $USER_POOL | jq -rc '.Users[].Attributes[2].Value' | while read i; do
-    echo $i
-  done
+  aws cognito-idp list-users --user-pool-id $USER_POOL | jq -rc '.Users[].Attributes[] | select(.Name == "email")' | jq -r ."Value"
 }
 
 if [ -z $USER_POOL ]; then

@@ -96,6 +96,18 @@ Resources:
         - Key: Master
           Value: "true"
 
+  DatabaseSecondaryInstance:
+    Type: AWS::RDS::DBInstance
+    Condition: IsProd
+    Properties:
+      Engine: aurora
+      DBClusterIdentifier: !Ref DatabaseCluster
+      DBInstanceClass: !Ref InstanceType
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      MonitoringInterval: 60
+      MonitoringRoleArn:
+        Fn::ImportValue: !Sub ${Stage}:RdsEnhancedMonitoringRoleArn
+
   DatabaseMasterCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -183,3 +195,7 @@ Outputs:
     Value: !GetAtt DatabaseMasterInstance.Endpoint.Address
     Export:
       Name: !Sub ${Stage}:RdsHostName
+  RdsClusterEndpoint:
+    Value: !GetAtt DatabaseCluster.Endpoint.Address
+    Export:
+      Name: !Sub ${Stage}:RdsClusterEndpoint

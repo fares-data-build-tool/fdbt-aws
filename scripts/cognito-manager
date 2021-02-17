@@ -104,21 +104,6 @@ function get_all_user_emails() {
   aws cognito-idp list-users --user-pool-id $USER_POOL | jq -rc '.Users[].Attributes[] | select(.Name == "email")' | jq -r ."Value"
 }
 
-function add_admin_panel_user() {
-  if [ -z $EMAIL ]; then
-    echo "usage: cognito-manager add-admin-panel-user <email>"
-    exit 1
-  fi
-
-  ADMIN_USER_POOL=$(aws cognito-idp list-user-pools --max-results 2 | jq -r '.UserPools[]|select(.Name | startswith("fdbt-admin-user-pool")).Id')
-  
-  TEMP_PASSWORD=$(cat /dev/urandom | env LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
-  aws cognito-idp admin-create-user --user-pool-id $ADMIN_USER_POOL --username $EMAIL --temporary-password $TEMP_PASSWORD --region eu-west-2
-  aws cognito-idp admin-update-user-attributes --user-pool-id $ADMIN_USER_POOL --username $EMAIL --user-attributes Name=email_verified,Value=true
-
-  echo "https://fares-data.dft.gov.uk/register?key=$TEMP_PASSWORD"
-}
-
 if [ -z $USER_POOL ]; then
   echo "You must be authenticated against the target AWS account"
   exit 1
@@ -142,8 +127,6 @@ elif [[ $COMMAND = 'verify-all-emails' ]]; then
   verify_all_emails
 elif [[ $COMMAND = 'get-all-user-emails' ]]; then
   get_all_user_emails
-elif [[ $COMMAND = 'add-admin-panel-user' ]]; then
-  add_admin_panel_user
 else
   echo "usage cognito-manager <add-user | add-scheme-operator | delete-user | update-noc | update-scheme-operator-name | update-scheme-operator-region-code | verify-all-emails | get-all-user-emails>"
   exit 1

@@ -46,8 +46,6 @@ const getS3Client = (): AWS.S3 => {
   return new AWS.S3(options);
 };
 
-// linename_faretype_passengertype_nocCode
-
 const s3 = getS3Client();
 const athenaExpressConfig = { aws: AWS };
 const athenaExpress = new AthenaExpress(athenaExpressConfig);
@@ -60,7 +58,9 @@ export const getFareChartFileContents = async (
   } else if (filePath.includes(".xls")) {
     const workBook = XLSX.readFile(filePath);
     const sheetName = workBook.SheetNames[0];
-    return XLSX.utils.sheet_to_csv(workBook.Sheets[sheetName]);
+    const contents = XLSX.utils.sheet_to_csv(workBook.Sheets[sheetName], {FS: "|"});
+    console.log(contents);
+    return contents;
   } else {
     console.log(`Invalid fare chart file type ${filePath}`);
     return;
@@ -90,7 +90,8 @@ export const containsDuplicateFareStages = (
 ): boolean => uniq(fareStageNames).length !== fareStageNames.length;
 
 export const faresTriangleDataMapper = (
-  dataToMap: string
+  dataToMap: string,
+  fileName: string,
 ): UserFareStages | null => {
   const fareTriangle: FareTriangleData = {
     fareStages: [],
@@ -98,13 +99,15 @@ export const faresTriangleDataMapper = (
 
   const fareStageLines = Papa.parse(dataToMap, { skipEmptyLines: "greedy" })
     .data as string[][];
+
+  console.log(fareStageLines);
   const fareStageCount = fareStageLines.length;
   const isPence = false;
 
   if (fareStageCount < 2) {
     console.warn("", {
       context: "api.csvUpload",
-      message: `At least 2 fare stages are needed, only ${fareStageCount} found`,
+      message: `At least 2 fare stages are needed, only ${fareStageCount} found for ${fileName}`,
     });
     return null;
   }
@@ -124,7 +127,7 @@ export const faresTriangleDataMapper = (
     if (!stageName) {
       console.warn("", {
         context: "api.csvUpload",
-        message: `Empty fare stage name found in uploaded file`,
+        message: `Empty fare stage name found in uploaded file ${fileName}`,
       });
       return null;
     }
@@ -150,7 +153,7 @@ export const faresTriangleDataMapper = (
         if (Number.isNaN(Number(price))) {
           console.warn("", {
             context: "api.csvUpload",
-            message: `invalid price in CSV upload`,
+            message: `invalid price in CSV upload ${fileName}`,
           });
           return null;
         }
@@ -158,7 +161,7 @@ export const faresTriangleDataMapper = (
         if (isPence && Number(price) % 1 !== 0) {
           console.warn("", {
             context: "api.csvUpload",
-            message: `decimal price in CSV upload`,
+            message: `decimal price in CSV upload ${fileName}`,
           });
           return null;
         }
@@ -186,7 +189,7 @@ export const faresTriangleDataMapper = (
   if (!pricesSet) {
     console.warn("", {
       context: "api.csvUpload",
-      message: "No prices set in uploaded fares triangle",
+      message: `No prices set in uploaded fares triangle ${fileName}`,
     });
     return null;
   }
@@ -205,7 +208,7 @@ export const faresTriangleDataMapper = (
   if (containsDuplicateFareStages(fareStageNames)) {
     console.warn("", {
       context: "api.csvUpload",
-      message: `Duplicate fare stage names found, fare stage names: ${fareStageNames}`,
+      message: `Duplicate fare stage names found for ${fileName}, fare stage names: ${fareStageNames}`,
     });
     return null;
   }
@@ -217,13 +220,6 @@ export const putMatchingJSONInS3 = async (
   key: string,
   text: string
 ): Promise<void> => {
-  console.log("", {
-    context: "data.s3",
-    message: "uploading matching json to S3",
-    bucket: "fdbt-matching-data-reprocessed-test",
-    key,
-  });
-
   const request: AWS.S3.Types.PutObjectRequest = {
     Bucket: "fdbt-matching-data-reprocessed-test",
     Key: key,
@@ -253,22 +249,26 @@ export const remapFareZones = (
 export const reprocessFareChart = async (filePath: string): Promise<void> => {
   const fileName = path.parse(filePath).name;
   const fileDetails = fileName.split(" ");
-  const lineName = fileDetails[0];
-  const passengerType = fileDetailsMap[fileDetails[1]];
-  const ticketType = fileDetailsMap[fileDetails[2]];
-  const parsedFileDetails = fileDetails.map((detail) => fileDetailsMap[detail]);
+  let lineName, passengerType, ticketType;
+  try {
+    lineName = fileDetails[0];
+    passengerType = fileDetailsMap[fileDetails[1]];
+    ticketType = fileDetailsMap[fileDetails[2]];
+  } catch (err) {
+    console.log(`Invalid fares chart filename: ${fileName}`);
+    return;
+  }
 
   let results: any = await athenaExpress.query(
     `SELECT "$path" FROM business_intelligence.reprocessing_matching_data WHERE lineName = '${lineName}' AND passengerType = '${passengerType}' AND type = '${ticketType}' AND nocCode = 'NVTR'`
   );
 
   if (results.Items?.length !== 1) {
-    console.log(`${results.Items?.length} matching JSON found for ${filePath}`);
+    console.log(`${results.Items?.length} matching JSON found for ${fileName}`);
     return;
   }
 
   const s3Key = results.Items[0]["$path"].split("replica/")[1];
-  console.log(s3Key);
 
   const s3Params = {
     Bucket: "fdbt-matching-data-prod-replica",
@@ -282,7 +282,7 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
 
   const fareChartFileContents = await getFareChartFileContents(filePath);
   if (fareChartFileContents) {
-    const mappedFaresData = faresTriangleDataMapper(fareChartFileContents);
+    const mappedFaresData = faresTriangleDataMapper(fareChartFileContents, fileName);
     if (mappedFaresData) {
       let updatedMatchingJSON: any = {};
       if (ticketType === "single") {
@@ -317,19 +317,14 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
       }
 
       delete updatedMatchingJSON.email;
-      await fs.promises.writeFile(
-        "output.json",
-        JSON.stringify(updatedMatchingJSON),
-        "utf-8"
-      );
 
-      await putMatchingJSONInS3(
-        `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
-        JSON.stringify(updatedMatchingJSON)
-      );
+      // await putMatchingJSONInS3(
+      //   `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
+      //   JSON.stringify(updatedMatchingJSON)
+      // );
     }
   } else {
-    console.log("Failed to retrieve fare chart data");
+    console.log(`Failed to retrieve fare chart data for ${fileName}`);
   }
 };
 

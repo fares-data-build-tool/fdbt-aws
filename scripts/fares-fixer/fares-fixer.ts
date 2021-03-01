@@ -58,11 +58,10 @@ export const getFareChartFileContents = async (
   } else if (filePath.includes(".xls")) {
     const workBook = XLSX.readFile(filePath);
     const sheetName = workBook.SheetNames[0];
-    const contents = XLSX.utils.sheet_to_csv(workBook.Sheets[sheetName], {FS: "|"});
-    console.log(contents);
+    const contents = XLSX.utils.sheet_to_csv(workBook.Sheets[sheetName]);
     return contents;
   } else {
-    console.log(`Invalid fare chart file type ${filePath}`);
+    console.error(`Invalid fare chart file type ${filePath}`);
     return;
   }
 };
@@ -73,7 +72,7 @@ export const getMatchingJSONFileContents = async (
   if (filePath.includes(".json")) {
     return JSON.parse(await fs.promises.readFile(filePath, "utf-8"));
   } else {
-    console.log(`Invalid json file type ${filePath}`);
+    console.error(`Invalid json file type ${filePath}`);
     return;
   }
 };
@@ -91,7 +90,7 @@ export const containsDuplicateFareStages = (
 
 export const faresTriangleDataMapper = (
   dataToMap: string,
-  fileName: string,
+  fileName: string
 ): UserFareStages | null => {
   const fareTriangle: FareTriangleData = {
     fareStages: [],
@@ -100,7 +99,6 @@ export const faresTriangleDataMapper = (
   const fareStageLines = Papa.parse(dataToMap, { skipEmptyLines: "greedy" })
     .data as string[][];
 
-  console.log(fareStageLines);
   const fareStageCount = fareStageLines.length;
   const isPence = false;
 
@@ -236,11 +234,27 @@ export const remapFareZones = (
 ): any => {
   return fareZones.map((fareZone: any) => {
     const fareZoneName = fareZone.name;
-    const newPrices = mappedFaresData.fareStages.find(
-      (stage) => stage.stageName === fareZoneName
-    );
+    let validName = fareZoneName;
+
+    const newPrices = mappedFaresData.fareStages.find((stage) => {
+      let fareStageNameToMatch = stage.stageName;
+
+      if (stage.stageName.includes(",")) {
+        fareStageNameToMatch = `"${stage.stageName.split(",")[0]}`;
+      }
+
+      const match = fareZoneName === fareStageNameToMatch;
+
+      if (match) {
+        validName = stage.stageName;
+      }
+
+      return match;
+    });
+
     return {
       ...fareZone,
+      name: validName,
       prices: newPrices?.prices ?? [],
     };
   });
@@ -255,7 +269,7 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
     passengerType = fileDetailsMap[fileDetails[1]];
     ticketType = fileDetailsMap[fileDetails[2]];
   } catch (err) {
-    console.log(`Invalid fares chart filename: ${fileName}`);
+    console.error(`Invalid fares chart filename: ${fileName}`);
     return;
   }
 
@@ -282,7 +296,10 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
 
   const fareChartFileContents = await getFareChartFileContents(filePath);
   if (fareChartFileContents) {
-    const mappedFaresData = faresTriangleDataMapper(fareChartFileContents, fileName);
+    const mappedFaresData = faresTriangleDataMapper(
+      fareChartFileContents,
+      fileName
+    );
     if (mappedFaresData) {
       let updatedMatchingJSON: any = {};
       if (ticketType === "single") {
@@ -318,13 +335,13 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
 
       delete updatedMatchingJSON.email;
 
-      // await putMatchingJSONInS3(
-      //   `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
-      //   JSON.stringify(updatedMatchingJSON)
-      // );
+      await putMatchingJSONInS3(
+        `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
+        JSON.stringify(updatedMatchingJSON)
+      );
     }
   } else {
-    console.log(`Failed to retrieve fare chart data for ${fileName}`);
+    console.error(`Failed to retrieve fare chart data for ${fileName}`);
   }
 };
 

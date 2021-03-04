@@ -260,8 +260,11 @@ export const remapFareZones = (
   });
 };
 
-export const reprocessFareChart = async (filePath: string): Promise<void> => {
-  const fileName = path.parse(filePath).name;
+export const reprocessFareChart = async (
+  nocCode: string,
+  filePath: string
+): Promise<void> => {
+  let fileName = path.parse(filePath).name;
   const fileDetails = fileName.split(" ");
   let lineName, passengerType, ticketType;
   try {
@@ -274,32 +277,39 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
   }
 
   let results: any = await athenaExpress.query(
-    `SELECT "$path" FROM business_intelligence.reprocessing_matching_data WHERE lineName = '${lineName}' AND passengerType = '${passengerType}' AND type = '${ticketType}' AND nocCode = 'NVTR'`
+    `SELECT "$path" FROM business_intelligence.reprocessing_matching_data WHERE lineName = '${lineName}' AND passengerType = '${passengerType}' AND type = '${ticketType}' AND nocCode = '${nocCode}'`
   );
 
-  if (results.Items?.length !== 1) {
-    console.log(`${results.Items?.length} matching JSON found for ${fileName}`);
+  if (results.Items?.length == 0) {
+    console.log(`No matching JSON found for ${fileName}`);
     return;
   }
 
-  const s3Key = results.Items[0]["$path"].split("replica/")[1];
-
-  const s3Params = {
-    Bucket: "fdbt-matching-data-prod-replica",
-    Key: s3Key,
-  };
-
-  const response = await s3.getObject(s3Params).promise();
-  const dataAsString = response.Body?.toString("utf-8") ?? "";
-
-  const matchingJSON = JSON.parse(dataAsString);
-
   const fareChartFileContents = await getFareChartFileContents(filePath);
-  if (fareChartFileContents) {
-    const mappedFaresData = faresTriangleDataMapper(
-      fareChartFileContents,
-      fileName
-    );
+
+  if (!fareChartFileContents) {
+    console.error(`Failed to retrieve fare chart data for ${fileName}`);
+    return;
+  }
+
+  const mappedFaresData = faresTriangleDataMapper(
+    fareChartFileContents,
+    fileName
+  );
+
+  let i;
+  for (i = 0; i < results.Items.length; i++) {
+    const s3Key = results.Items[i]["$path"].split("replica/")[1];
+
+    const s3Params = {
+      Bucket: "fdbt-matching-data-prod-replica",
+      Key: s3Key,
+    };
+
+    const response = await s3.getObject(s3Params).promise();
+    const dataAsString = response.Body?.toString("utf-8") ?? "";
+    const matchingJSON = JSON.parse(dataAsString);
+
     if (mappedFaresData) {
       let updatedMatchingJSON: any = {};
       if (ticketType === "single") {
@@ -335,20 +345,30 @@ export const reprocessFareChart = async (filePath: string): Promise<void> => {
 
       delete updatedMatchingJSON.email;
 
-      await putMatchingJSONInS3(
-        `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
-        JSON.stringify(updatedMatchingJSON)
-      );
+      if (i > 0) fileName = `${fileName} ${i+1}`
+
+      // await putMatchingJSONInS3(
+      //   `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
+      //   JSON.stringify(updatedMatchingJSON)
+      // );
+
+      console.log(`Matching JSON for ${fileName} uploaded to S3`);
     }
-  } else {
-    console.error(`Failed to retrieve fare chart data for ${fileName}`);
   }
 };
 
 export const main = async () => {
   try {
-    const files = await fs.promises.readdir("./NVTR");
-    for await (const file of files) reprocessFareChart(`./NVTR/${file}`);
+    const nocCode = process.env.NOC_CODE;
+
+    if (!nocCode) {
+      console.log("No NOC_CODE variable provided");
+      return;
+    }
+
+    const files = await fs.promises.readdir(`./fares/${nocCode}`);
+    for await (const file of files)
+      reprocessFareChart(nocCode, `./fares/${nocCode}/${file}`);
   } catch (err) {
     console.error(err);
   }

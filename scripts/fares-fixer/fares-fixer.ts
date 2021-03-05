@@ -1,9 +1,7 @@
 import fs from "fs";
-import XLSX, { utils } from "xlsx";
+import XLSX from "xlsx";
 import Papa from "papaparse";
 import uniq from "lodash/uniq";
-import util from "util";
-import { find } from "lodash";
 import AWS from "aws-sdk";
 import { AthenaExpress } from "athena-express";
 import path from "path";
@@ -347,10 +345,10 @@ export const reprocessFareChart = async (
 
       if (i > 0) fileName = `${fileName} ${i+1}`
 
-      // await putMatchingJSONInS3(
-      //   `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
-      //   JSON.stringify(updatedMatchingJSON)
-      // );
+      await putMatchingJSONInS3(
+        `${updatedMatchingJSON.nocCode}-reprocessed/${fileName}.json`,
+        JSON.stringify(updatedMatchingJSON)
+      );
 
       console.log(`Matching JSON for ${fileName} uploaded to S3`);
     }

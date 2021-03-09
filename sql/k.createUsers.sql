@@ -9,6 +9,7 @@ DROP USER 'fdbt_site'@'%';
 CREATE USER 'fdbt_site'@'%' IDENTIFIED BY '<INSERT PASSWORD>';
 GRANT SELECT ON fdbt.* TO 'fdbt_site'@'%';
 GRANT INSERT ON fdbt.salesOfferPackage TO 'fdbt_site'@'%';
+GRANT INSERT ON fdbt.timeRestriction TO 'fdbt_site'@'%';
 
 GRANT USAGE ON fdbt.* TO 'fdbt_netex'@'%' IDENTIFIED BY 'password';
 DROP USER 'fdbt_netex'@'%';

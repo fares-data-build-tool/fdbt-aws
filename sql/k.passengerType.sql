@@ -7,6 +7,7 @@ CREATE TABLE passengerType(
     `nocCode` varchar(255) NOT NULL,
     `name` varchar(255) NOT NULL,
     `contents` text NOT NULL,
+    `group` boolean NOT NULL,
     INDEX idx_nocCode (nocCode),
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB CHARACTER SET = utf8;

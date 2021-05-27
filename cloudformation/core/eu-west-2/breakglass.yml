@@ -118,7 +118,7 @@ Resources:
           });
 
           exports.handler = async (event) => {
-              const response = await iam.addUserToGroup({
+              await iam.addUserToGroup({
                   GroupName: process.env.GROUP_NAME,
                   UserName: event.username
               }).promise();
@@ -160,7 +160,7 @@ Resources:
           });
 
           exports.handler = async (event) => {
-              const response = await iam.removeUserFromGroup({
+              await iam.removeUserFromGroup({
                   GroupName: process.env.GROUP_NAME,
                   UserName: event.username
               }).promise();
